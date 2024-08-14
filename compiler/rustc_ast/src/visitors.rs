@@ -163,10 +163,6 @@ macro_rules! mutability_dependent {
             walk_lifetime(self, l);
         }
 
-        fn visit_foreign_mod(&mut self, nm: &mut ForeignMod) {
-            walk_foreign_mod(self, nm);
-        }
-
         fn flat_map_variant(&mut self, v: Variant) -> SmallVec<[Variant; 1]> {
             walk_flat_map_variant(self, v)
         }
@@ -414,6 +410,9 @@ macro_rules! make_ast_visitor {
                 walk_parenthesized_parameter_data(self, p)
             }
 
+            fn visit_foreign_mod(&mut self, nm: ref_t!(ForeignMod)) -> result!() {
+                walk_foreign_mod(self, nm)
+            }
 
             // FIXME: remove _ on ident if mut
             // FIXME: for some reason the immutable version doesn't receive a reference
@@ -682,8 +681,8 @@ pub mod visit {
                     }
                     ModKind::Unloaded => {}
                 },
-                ItemKind::ForeignMod(ForeignMod { safety: _, abi: _, items }) => {
-                    walk_list!(visitor, visit_foreign_item, items);
+                ItemKind::ForeignMod(foreign_mod) => {
+                    try_visit!(visitor.visit_foreign_mod(foreign_mod));
                 }
                 ItemKind::GlobalAsm(asm) => try_visit!(visitor.visit_inline_asm(asm)),
                 ItemKind::TyAlias(box TyAlias {
@@ -1581,6 +1580,13 @@ pub mod visit {
         try_visit!(vis.visit_fn_ret_ty(output));
         V::Result::output()
     }
+
+    fn walk_foreign_mod<'a, V: Visitor<'a>>(vis: &mut V, foreign_mod: &'a ForeignMod) -> V::Result {
+        let ForeignMod { safety: _, abi: _, items } = foreign_mod;
+        walk_list!(vis, visit_foreign_item, items);
+        V::Result::output()
+    }
+
 }
 
 pub mod mut_visit {
