@@ -1749,10 +1749,7 @@ pub mod mut_visit {
         vis.visit_span(close);
     }
 
-    pub fn walk_pat_field<T: MutVisitor>(
-        vis: &mut T,
-        fp: &mut PatField,
-    ) {
+    pub fn walk_pat_field<T: MutVisitor>(vis: &mut T, fp: &mut PatField) {
         let PatField { attrs, id, ident, is_placeholder: _, is_shorthand: _, pat, span } = fp;
         vis.visit_id(id);
         visit_attrs(vis, attrs);
@@ -1883,12 +1880,8 @@ pub mod mut_visit {
         items.flat_map_in_place(|item| vis.flat_map_foreign_item(item));
     }
 
-    pub fn walk_variant<T: MutVisitor>(
-        visitor: &mut T,
-        variant: &mut Variant,
-    ) {
-        let Variant { ident, vis, attrs, id, data, disr_expr, span, is_placeholder: _ } =
-            variant;
+    pub fn walk_variant<T: MutVisitor>(visitor: &mut T, variant: &mut Variant) {
+        let Variant { ident, vis, attrs, id, data, disr_expr, span, is_placeholder: _ } = variant;
         visitor.visit_id(id);
         visit_attrs(visitor, attrs);
         visitor.visit_vis(vis);
@@ -2038,10 +2031,7 @@ pub mod mut_visit {
         vis.visit_span(span);
     }
 
-    pub fn walk_param<T: MutVisitor>(
-        vis: &mut T,
-        param: &mut Param,
-    ) {
+    pub fn walk_param<T: MutVisitor>(vis: &mut T, param: &mut Param) {
         let Param { attrs, id, pat, span, ty, is_placeholder: _ } = param;
         vis.visit_id(id);
         visit_attrs(vis, attrs);
@@ -2316,10 +2306,7 @@ pub mod mut_visit {
         }
     }
 
-    pub fn walk_generic_param<T: MutVisitor>(
-        vis: &mut T,
-        param: &mut GenericParam,
-    ) {
+    pub fn walk_generic_param<T: MutVisitor>(vis: &mut T, param: &mut GenericParam) {
         let GenericParam { id, ident, attrs, bounds, kind, colon_span, is_placeholder: _ } = param;
         vis.visit_id(id);
         visit_attrs(vis, attrs);
@@ -2427,10 +2414,7 @@ pub mod mut_visit {
         vis.visit_span(span);
     }
 
-    pub fn walk_field_def<T: MutVisitor>(
-        visitor: &mut T,
-        fd: &mut FieldDef,
-    ) {
+    pub fn walk_field_def<T: MutVisitor>(visitor: &mut T, fd: &mut FieldDef) {
         let FieldDef { span, ident, vis, id, ty, attrs, is_placeholder: _ } = fd;
         visitor.visit_id(id);
         visit_attrs(visitor, attrs);
@@ -2448,10 +2432,7 @@ pub mod mut_visit {
         smallvec![fd]
     }
 
-    pub fn walk_expr_field<T: MutVisitor>(
-        vis: &mut T,
-        f: &mut ExprField,
-    ) {
+    pub fn walk_expr_field<T: MutVisitor>(vis: &mut T, f: &mut ExprField) {
         let ExprField { ident, expr, span, is_shorthand: _, attrs, id, is_placeholder: _ } = f;
         vis.visit_id(id);
         visit_attrs(vis, attrs);
