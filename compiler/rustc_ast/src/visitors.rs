@@ -26,15 +26,6 @@ macro_rules! mutability_dependent {
         fn visit_path(&mut self, path: &'ast Path, _id: NodeId) -> Self::Result {
             walk_path(self, path)
         }
-        // FIXME: inconsistent
-        fn visit_use_tree(
-            &mut self,
-            use_tree: &'ast UseTree,
-            id: NodeId,
-            _nested: bool,
-        ) -> Self::Result {
-            walk_use_tree(self, use_tree, id)
-        }
     };
     (mut $($lf: lifetime)?) => {
         /// Mutable token visiting only exists for the `macro_rules` token marker and should not be
@@ -81,10 +72,6 @@ macro_rules! mutability_dependent {
 
         fn visit_meta_item(&mut self, meta_item: &mut MetaItem) {
             walk_meta_item(self, meta_item);
-        }
-
-        fn visit_use_tree(&mut self, use_tree: &mut UseTree) {
-            walk_use_tree(self, use_tree);
         }
 
         fn flat_map_foreign_item(&mut self, ni: P<ForeignItem>) -> SmallVec<[P<ForeignItem>; 1]> {
@@ -365,6 +352,14 @@ macro_rules! make_ast_visitor {
                 self.visit_expr(ex)
             }
 
+            fn visit_use_tree(
+                &mut self,
+                use_tree: ref_t!(UseTree),
+                id: NodeId,
+                _nested: bool,
+            ) -> result!() {
+                walk_use_tree(self, use_tree, id)
+            }
         }
 
         macro_rules! visit_span {
@@ -1855,7 +1850,7 @@ pub mod mut_visit {
         vis.visit_span(close);
     }
 
-    fn walk_use_tree<T: MutVisitor>(vis: &mut T, use_tree: &mut UseTree) {
+    fn walk_use_tree<T: MutVisitor>(vis: &mut T, use_tree: &mut UseTree, _id: NodeId) {
         let UseTree { prefix, kind, span } = use_tree;
         vis.visit_path(prefix);
         match kind {
@@ -1863,7 +1858,7 @@ pub mod mut_visit {
             UseTreeKind::Nested { items, span } => {
                 for (tree, id) in items {
                     vis.visit_id(id);
-                    vis.visit_use_tree(tree);
+                    vis.visit_use_tree(tree, *id, true);
                 }
                 vis.visit_span(span);
             }
@@ -2332,7 +2327,7 @@ pub mod mut_visit {
         fn walk(&mut self, span: Span, id: NodeId, vis: &mut impl MutVisitor) {
             match self {
                 ItemKind::ExternCrate(_orig_name) => {}
-                ItemKind::Use(use_tree) => vis.visit_use_tree(use_tree),
+                ItemKind::Use(use_tree) => vis.visit_use_tree(use_tree, id, false),
                 ItemKind::Static(box StaticItem { ty, safety: _, mutability: _, expr }) => {
                     vis.visit_ty(ty);
                     visit_opt(expr, |expr| vis.visit_expr(expr));
