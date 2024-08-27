@@ -22,10 +22,6 @@ macro_rules! mutability_dependent {
         fn visit_mac_def(&mut self, _mac: &'ast MacroDef, _id: NodeId) -> Self::Result {
             Self::Result::output()
         }
-        // FIXME: inconsistent
-        fn visit_path(&mut self, path: &'ast Path, _id: NodeId) -> Self::Result {
-            walk_path(self, path)
-        }
     };
     (mut $($lf: lifetime)?) => {
         /// Mutable token visiting only exists for the `macro_rules` token marker and should not be
@@ -104,10 +100,6 @@ macro_rules! mutability_dependent {
 
         fn visit_lifetime(&mut self, l: &mut Lifetime) {
             walk_lifetime(self, l);
-        }
-
-        fn visit_path(&mut self, p: &mut Path) {
-            walk_path(self, p);
         }
 
         fn visit_macro_def(&mut self, def: &mut MacroDef) {
@@ -359,6 +351,10 @@ macro_rules! make_ast_visitor {
                 _nested: bool,
             ) -> result!() {
                 walk_use_tree(self, use_tree, id)
+            }
+
+            fn visit_path(&mut self, path: ref_t!(Path), _id: NodeId) -> result!() {
+                walk_path(self, path)
             }
         }
 
@@ -1850,9 +1846,9 @@ pub mod mut_visit {
         vis.visit_span(close);
     }
 
-    fn walk_use_tree<T: MutVisitor>(vis: &mut T, use_tree: &mut UseTree, _id: NodeId) {
+    fn walk_use_tree<T: MutVisitor>(vis: &mut T, use_tree: &mut UseTree, id: NodeId) {
         let UseTree { prefix, kind, span } = use_tree;
-        vis.visit_path(prefix);
+        vis.visit_path(prefix, id);
         match kind {
             UseTreeKind::Simple(rename) => visit_opt(rename, |rename| vis.visit_ident(rename)),
             UseTreeKind::Nested { items, span } => {
@@ -1919,7 +1915,7 @@ pub mod mut_visit {
             }
             TyKind::Path(qself, path) => {
                 vis.visit_qself(qself);
-                vis.visit_path(path);
+                vis.visit_path(path, *id);
             }
             TyKind::Array(ty, length) => {
                 vis.visit_ty(ty);
@@ -1973,7 +1969,7 @@ pub mod mut_visit {
                     item: AttrItem { unsafety: _, path, args, tokens },
                     tokens: attr_tokens,
                 } = &mut **normal;
-                vis.visit_path(path);
+                vis.visit_path(path, DUMMY_NODE_ID);
                 visit_attr_args(vis, args);
                 visit_lazy_tts(vis, tokens);
                 visit_lazy_tts(vis, attr_tokens);
@@ -1985,7 +1981,7 @@ pub mod mut_visit {
 
     fn walk_mac<T: MutVisitor>(vis: &mut T, mac: &mut MacCall) {
         let MacCall { path, args } = mac;
-        vis.visit_path(path);
+        vis.visit_path(path, DUMMY_NODE_ID);
         visit_delim_args(vis, args);
     }
 
@@ -2148,11 +2144,11 @@ pub mod mut_visit {
             token::NtLiteral(expr) => vis.visit_expr(expr),
             token::NtMeta(item) => {
                 let AttrItem { unsafety: _, path, args, tokens } = item.deref_mut();
-                vis.visit_path(path);
+                vis.visit_path(path, DUMMY_NODE_ID);
                 visit_attr_args(vis, args);
                 visit_lazy_tts(vis, tokens);
             }
-            token::NtPath(path) => vis.visit_path(path),
+            token::NtPath(path) => vis.visit_path(path, DUMMY_NODE_ID),
             token::NtVis(visib) => vis.visit_vis(visib),
         }
     }
@@ -2242,7 +2238,7 @@ pub mod mut_visit {
             }
             PreciseCapturingArg::Arg(path, id) => {
                 vis.visit_id(id);
-                vis.visit_path(path);
+                vis.visit_path(path, *id);
             }
         }
     }
@@ -2302,7 +2298,7 @@ pub mod mut_visit {
 
     fn walk_trait_ref<T: MutVisitor>(vis: &mut T, TraitRef { path, ref_id }: &mut TraitRef) {
         vis.visit_id(ref_id);
-        vis.visit_path(path);
+        vis.visit_path(path, *ref_id);
     }
 
     pub fn walk_block<T: MutVisitor>(vis: &mut T, block: &mut P<Block>) {
@@ -2419,7 +2415,7 @@ pub mod mut_visit {
                 }) => {
                     vis.visit_id(id);
                     vis.visit_qself(qself);
-                    vis.visit_path(path);
+                    vis.visit_path(path, *id);
                     if let Some(rename) = rename {
                         vis.visit_ident(rename);
                     }
@@ -2429,7 +2425,7 @@ pub mod mut_visit {
                 }
                 ItemKind::DelegationMac(box DelegationMac { qself, prefix, suffixes, body }) => {
                     vis.visit_qself(qself);
-                    vis.visit_path(prefix);
+                    vis.visit_path(prefix, id);
                     if let Some(suffixes) = suffixes {
                         for (ident, rename) in suffixes {
                             vis.visit_ident(ident);
@@ -2480,7 +2476,7 @@ pub mod mut_visit {
                 }) => {
                     visitor.visit_id(id);
                     visitor.visit_qself(qself);
-                    visitor.visit_path(path);
+                    visitor.visit_path(path, *id);
                     if let Some(rename) = rename {
                         visitor.visit_ident(rename);
                     }
@@ -2495,7 +2491,7 @@ pub mod mut_visit {
                     body,
                 }) => {
                     visitor.visit_qself(qself);
-                    visitor.visit_path(prefix);
+                    visitor.visit_path(prefix, id);
                     if let Some(suffixes) = suffixes {
                         for (ident, rename) in suffixes {
                             visitor.visit_ident(ident);
@@ -2587,16 +2583,16 @@ pub mod mut_visit {
             PatKind::Lit(e) => vis.visit_expr(e),
             PatKind::TupleStruct(qself, path, elems) => {
                 vis.visit_qself(qself);
-                vis.visit_path(path);
+                vis.visit_path(path, *id);
                 visit_thin_vec(elems, |elem| vis.visit_pat(elem));
             }
             PatKind::Path(qself, path) => {
                 vis.visit_qself(qself);
-                vis.visit_path(path);
+                vis.visit_path(path, *id);
             }
             PatKind::Struct(qself, path, fields, _etc) => {
                 vis.visit_qself(qself);
-                vis.visit_path(path);
+                vis.visit_path(path, *id);
                 fields.flat_map_in_place(|field| vis.flat_map_pat_field(field));
             }
             PatKind::Box(inner) => vis.visit_pat(inner),
@@ -2623,7 +2619,7 @@ pub mod mut_visit {
     ) {
         vis.visit_id(id);
         vis.visit_qself(qself);
-        vis.visit_path(path);
+        vis.visit_path(path, *id);
     }
 
     pub fn walk_expr<T: MutVisitor>(
@@ -2760,7 +2756,7 @@ pub mod mut_visit {
             ExprKind::Underscore => {}
             ExprKind::Path(qself, path) => {
                 vis.visit_qself(qself);
-                vis.visit_path(path);
+                vis.visit_path(path, *id);
             }
             ExprKind::Break(label, expr) => {
                 visit_opt(label, |label| vis.visit_label(label));
@@ -2788,7 +2784,7 @@ pub mod mut_visit {
             ExprKind::Struct(se) => {
                 let StructExpr { qself, path, fields, rest } = se.deref_mut();
                 vis.visit_qself(qself);
-                vis.visit_path(path);
+                vis.visit_path(path, *id);
                 fields.flat_map_in_place(|field| vis.flat_map_expr_field(field));
                 match rest {
                     StructRest::Base(expr) => vis.visit_expr(expr),
@@ -2874,7 +2870,7 @@ pub mod mut_visit {
             VisibilityKind::Public | VisibilityKind::Inherited => {}
             VisibilityKind::Restricted { path, id, shorthand: _ } => {
                 vis.visit_id(id);
-                vis.visit_path(path);
+                vis.visit_path(path, *id);
             }
         }
         visit_lazy_tts(vis, tokens);
