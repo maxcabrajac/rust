@@ -1163,7 +1163,10 @@ pub mod visit {
     pub trait WalkItemKind: Sized {
         fn walk<'a, V: Visitor<'a>>(
             &'a self,
-            item: &'a Item<Self>,
+            id: NodeId,
+            span: Span,
+            vis: &'a Visibility,
+            ident: &'a Ident,
             visitor: &mut V,
         ) -> V::Result;
     }
@@ -1173,13 +1176,15 @@ pub mod visit {
     impl WalkItemKind for ItemKind {
         fn walk<'a, V: Visitor<'a>>(
             &'a self,
-            item: &'a Item<Self>,
+            id: NodeId,
+            span: Span,
+            vis: &'a Visibility,
+            ident: &'a Ident,
             visitor: &mut V,
         ) -> V::Result {
-            let Item { id, span, vis, ident, .. } = item;
             match self {
                 ItemKind::ExternCrate(_rename) => {}
-                ItemKind::Use(use_tree) => try_visit!(visitor.visit_use_tree(use_tree, *id, false)),
+                ItemKind::Use(use_tree) => try_visit!(visitor.visit_use_tree(use_tree, id, false)),
                 ItemKind::Static(box StaticItem { ty, safety: _, mutability: _, expr }) => {
                     try_visit!(visitor.visit_ty(ty));
                     visit_opt!(visitor, visit_expr, expr);
@@ -1192,7 +1197,7 @@ pub mod visit {
                 ItemKind::Fn(box Fn { defaultness: _, generics, sig, body }) => {
                     let kind =
                         FnKind::Fn(FnCtxt::Free, *ident, sig, vis, generics, body.as_deref());
-                    try_visit!(visitor.visit_fn(kind, *span, *id));
+                    try_visit!(visitor.visit_fn(kind, span, id));
                 }
                 ItemKind::Mod(_unsafety, mod_kind) => match mod_kind {
                     ModKind::Loaded(items, _inline, _inner_span) => {
@@ -1249,7 +1254,7 @@ pub mod visit {
                     walk_list!(visitor, visit_param_bound, bounds, BoundKind::Bound);
                 }
                 ItemKind::MacCall(mac) => try_visit!(visitor.visit_mac_call(mac)),
-                ItemKind::MacroDef(ts) => try_visit!(visitor.visit_mac_def(ts, *id)),
+                ItemKind::MacroDef(ts) => try_visit!(visitor.visit_mac_def(ts, id)),
                 ItemKind::Delegation(box Delegation {
                     id,
                     qself,
@@ -1265,7 +1270,7 @@ pub mod visit {
                 }
                 ItemKind::DelegationMac(box DelegationMac { qself, prefix, suffixes, body }) => {
                     try_visit!(visitor.visit_qself(qself));
-                    try_visit!(visitor.visit_path(prefix, *id));
+                    try_visit!(visitor.visit_path(prefix, id));
                     if let Some(suffixes) = suffixes {
                         for (ident, rename) in suffixes {
                             visitor.visit_ident(*ident);
@@ -1285,11 +1290,11 @@ pub mod visit {
         visitor: &mut V,
         item: &'a Item<impl WalkItemKind>,
     ) -> V::Result {
-        let &Item { id: _, span: _, ident, ref vis, ref attrs, ref kind, tokens: _ } = item;
+        let Item { id, span, ident, vis, attrs, kind, tokens: _ } = item;
         walk_list!(visitor, visit_attribute, attrs);
         try_visit!(visitor.visit_vis(vis));
-        try_visit!(visitor.visit_ident(ident));
-        try_visit!(kind.walk(item, visitor));
+        try_visit!(visitor.visit_ident(*ident));
+        try_visit!(kind.walk(*id, *span, vis, ident, visitor));
         V::Result::output()
     }
 
@@ -1363,10 +1368,12 @@ pub mod visit {
     impl WalkItemKind for ForeignItemKind {
         fn walk<'a, V: Visitor<'a>>(
             &'a self,
-            item: &'a Item<Self>,
+            id: NodeId,
+            span: Span,
+            vis: &'a Visibility,
+            ident: &'a Ident,
             visitor: &mut V,
         ) -> V::Result {
-            let &Item { id, span, ident, ref vis, .. } = item;
             match self {
                 ForeignItemKind::Static(box StaticItem { ty, mutability: _, expr, safety: _ }) => {
                     try_visit!(visitor.visit_ty(ty));
@@ -1374,7 +1381,7 @@ pub mod visit {
                 }
                 ForeignItemKind::Fn(box Fn { defaultness: _, generics, sig, body }) => {
                     let kind =
-                        FnKind::Fn(FnCtxt::Foreign, ident, sig, vis, generics, body.as_deref());
+                        FnKind::Fn(FnCtxt::Foreign, *ident, sig, vis, generics, body.as_deref());
                     try_visit!(visitor.visit_fn(kind, span, id));
                 }
                 ForeignItemKind::TyAlias(box TyAlias {
