@@ -467,14 +467,6 @@ macro_rules! make_ast_visitor {
             }
         }
 
-        // FIXME: should only exist while Visitor::visit_ident
-        // doesn't receives a reference
-        macro_rules! visit_ident {
-            ($vis: ident, $ident: ident) => {
-                $vis.visit_ident($ident)
-            }
-        }
-
         macro_rules! return_result {
             ($V: ty) => { if_mut_expr!({}, {
                 <$V>::Result::output()
@@ -515,7 +507,7 @@ macro_rules! make_ast_visitor {
             label: ref_t!(Label)
         ) -> result!(V) {
             let Label { ident } = label;
-            try_v!(visit_ident!(vis, ident));
+            try_v!(vis.visit_ident(ident));
             return_result!(V)
         }
 
@@ -525,7 +517,7 @@ macro_rules! make_ast_visitor {
         ) -> result!(V) {
             let Lifetime { id, ident } = lifetime;
             try_v!(visit_id!(vis, id));
-            try_v!(visit_ident!(vis, ident));
+            try_v!(vis.visit_ident(ident));
             return_result!(V)
         }
 
@@ -578,7 +570,7 @@ macro_rules! make_ast_visitor {
             for FormatArgument { kind, expr } in arg_iter {
                 match kind {
                     FormatArgumentKind::Named(ident) | FormatArgumentKind::Captured(ident) => {
-                        try_v!(visit_ident!(vis, ident));
+                        try_v!(vis.visit_ident(ident));
                     }
                     FormatArgumentKind::Normal => {}
                 }
@@ -701,7 +693,7 @@ macro_rules! make_ast_visitor {
             let PatField { attrs, id, ident, is_placeholder: _, is_shorthand: _, pat, span } = fp;
             try_v!(visit_id!(vis, id));
             visit_list!(vis, visit_attribute, flat_map_attribute, attrs);
-            try_v!(visit_ident!(vis, ident));
+            try_v!(vis.visit_ident(ident));
             try_v!(vis.visit_pat(pat));
             try_v!(visit_span!(vis, span));
             return_result!(V)
@@ -768,7 +760,7 @@ macro_rules! make_ast_visitor {
             let ExprField { ident, expr, span, is_shorthand: _, attrs, id, is_placeholder: _ } = f;
             try_v!(visit_id!(vis, id));
             visit_list!(vis, visit_attribute, flat_map_attribute, attrs);
-            try_v!(visit_ident!(vis, ident));
+            try_v!(vis.visit_ident(ident));
             try_v!(vis.visit_expr(expr));
             try_v!(visit_span!(vis, span));
             return_result!(V)
@@ -796,7 +788,7 @@ macro_rules! make_ast_visitor {
             try_v!(visit_id!(visitor, id));
             visit_list!(visitor, visit_attribute, flat_map_attribute, attrs);
             try_v!(visitor.visit_vis(vis));
-            try_v!(visit_ident!(visitor, ident));
+            try_v!(visitor.visit_ident(ident));
             try_v!(visitor.visit_variant_data(data));
             visit_o!(disr_expr, |disr_expr| visitor.visit_variant_discr(disr_expr));
             try_v!(visit_span!(visitor, span));
@@ -809,7 +801,7 @@ macro_rules! make_ast_visitor {
         ) -> result!(V) {
             let PathSegment { id, ident, args } = segment;
             try_v!(visit_id!(vis, id));
-            try_v!(visit_ident!(vis, ident));
+            try_v!(vis.visit_ident(ident));
             visit_o!(args, |args| vis.visit_generic_args(args));
             return_result!(V)
         }
@@ -834,7 +826,7 @@ macro_rules! make_ast_visitor {
             try_v!(visit_id!(visitor, id));
             visit_list!(visitor, visit_attribute, flat_map_attribute, attrs);
             try_v!(visitor.visit_vis(vis));
-            visit_o!(ident, |ident| visit_ident!(visitor, ident));
+            visit_o!(ident, |ident| visitor.visit_ident(ident));
             try_v!(visitor.visit_ty(ty));
             try_v!(visit_span!(visitor, span));
             return_result!(V)
@@ -915,7 +907,7 @@ macro_rules! make_ast_visitor {
             match kind {
                 UseTreeKind::Simple(rename) => {
                     // The extra IDs are handled during AST lowering.
-                    visit_o!(rename, |rename: ref_t!(Ident)| visit_ident!(vis, rename));
+                    visit_o!(rename, |rename: ref_t!(Ident)| vis.visit_ident(rename));
                 }
                 UseTreeKind::Nested { items, span } => {
                     for (tree, id) in items {
@@ -1020,7 +1012,7 @@ macro_rules! make_ast_visitor {
                 PatKind::Err(_guar) => {}
                 PatKind::Wild | PatKind::Rest | PatKind::Never => {}
                 PatKind::Ident(_binding_mode, ident, sub) => {
-                    try_v!(visit_ident!(vis, ident));
+                    try_v!(vis.visit_ident(ident));
                     visit_o!(sub, |sub| vis.visit_pat(sub));
                 }
                 PatKind::Lit(e) => {
@@ -1191,7 +1183,7 @@ macro_rules! make_ast_visitor {
             let GenericParam { id, ident, attrs, bounds, kind, colon_span, is_placeholder: _ } = param;
             try_v!(visit_id!(vis, id));
             visit_list!(vis, visit_attribute, flat_map_attribute, attrs);
-            try_v!(visit_ident!(vis, ident));
+            try_v!(vis.visit_ident(ident));
             visit_list!(vis, visit_param_bound, bounds; BoundKind::Bound);
             match kind {
                 GenericParamKind::Lifetime => {}
@@ -1214,7 +1206,7 @@ macro_rules! make_ast_visitor {
         ) -> result!(V) {
             let AssocItemConstraint { id, ident, gen_args, kind, span } = constraint;
             try_v!(visit_id!(vis, id));
-            try_v!(visit_ident!(vis, ident));
+            try_v!(vis.visit_ident(ident));
             visit_o!(gen_args, |gen_args| vis.visit_generic_args(gen_args));
             match kind {
                 AssocItemConstraintKind::Equality { term } => {
@@ -1475,7 +1467,7 @@ macro_rules! make_ast_visitor {
                 }
                 ExprKind::Field(el, ident) => {
                     try_v!(vis.visit_expr(el));
-                    try_v!(visit_ident!(vis, ident));
+                    try_v!(vis.visit_ident(ident));
                 }
                 ExprKind::Index(main_expr, index_expr, brackets_span) => {
                     try_v!(vis.visit_expr(main_expr));
@@ -1514,10 +1506,7 @@ macro_rules! make_ast_visitor {
                 }
                 ExprKind::OffsetOf(container, fields) => {
                     try_v!(vis.visit_ty(container));
-                    // TODO: Use visit_list! after removing visit_ident!
-                    for field in if_mut_expr!(fields.iter_mut(), fields.iter()) {
-                        try_v!(visit_ident!(vis, field))
-                    }
+                    visit_list!(vis, visit_ident, if_mut_expr!(fields.iter_mut(), fields.iter()));
                 }
                 ExprKind::MacCall(mac) => {
                     try_v!(vis.visit_mac_call(mac))
@@ -1573,7 +1562,7 @@ macro_rules! make_ast_visitor {
             try_v!(visit_id!(visitor, id));
             visit_list!(visitor, visit_attribute, flat_map_attribute, attrs);
             try_v!(visitor.visit_vis(vis));
-            try_v!(visit_ident!(visitor, ident));
+            try_v!(visitor.visit_ident(ident));
             try_v!(kind.walk(*id, *span, vis, ident, visitor));
             visit_lazy_tts!(visitor, tokens);
             try_v!(visit_span!(visitor, span));
@@ -1590,7 +1579,7 @@ macro_rules! make_ast_visitor {
             try_v!(visit_id!(visitor, id));
             visit_list!(visitor, visit_attribute, flat_map_attribute, attrs);
             try_v!(visitor.visit_vis(vis));
-            try_v!(visit_ident!(visitor, ident));
+            try_v!(visitor.visit_ident(ident));
             match kind {
                 AssocItemKind::Const(box ConstItem { defaultness, generics, ty, expr }) => {
                     visit_defaultness!(visitor, defaultness);
@@ -1631,7 +1620,7 @@ macro_rules! make_ast_visitor {
                     try_v!(visit_id!(visitor, id));
                     try_v!(visitor.visit_qself(qself));
                     try_v!(visitor.visit_path(path, *id));
-                    visit_o!(rename, |rename| visit_ident!(visitor, rename));
+                    visit_o!(rename, |rename| visitor.visit_ident(rename));
                     visit_o!(body, |body| visitor.visit_block(body));
                 }
                 AssocItemKind::DelegationMac(box DelegationMac {
@@ -1644,8 +1633,8 @@ macro_rules! make_ast_visitor {
                     try_v!(visitor.visit_path(prefix, *id));
                     if let Some(suffixes) = suffixes {
                         for (ident, rename) in suffixes {
-                            try_v!(visit_ident!(visitor, ident));
-                            visit_o!(rename, |rename| visit_ident!(visitor, rename));
+                            try_v!(visitor.visit_ident(ident));
+                            visit_o!(rename, |rename| visitor.visit_ident(rename));
                         }
                     }
                     visit_o!(body, |body| visitor.visit_block(body));
@@ -1797,7 +1786,7 @@ macro_rules! make_ast_visitor {
                         try_v!(visit_id!(visitor, id));
                         try_v!(visitor.visit_qself(qself));
                         try_v!(visitor.visit_path(path, *id));
-                        visit_o!(rename, |rename| visit_ident!(visitor, rename));
+                        visit_o!(rename, |rename| visitor.visit_ident(rename));
                         visit_o!(body, |body| visitor.visit_block(body));
                     }
                     ItemKind::DelegationMac(box DelegationMac { qself, prefix, suffixes, body }) => {
@@ -1805,8 +1794,8 @@ macro_rules! make_ast_visitor {
                         try_v!(visitor.visit_path(prefix, id));
                         if let Some(suffixes) = suffixes {
                             for (ident, rename) in suffixes {
-                                try_v!(visit_ident!(visitor, ident));
-                                visit_o!(rename, |rename| visit_ident!(visitor, rename));
+                                try_v!(visitor.visit_ident(ident));
+                                visit_o!(rename, |rename| visitor.visit_ident(rename));
                             }
                         }
                         visit_o!(body, |body| visitor.visit_block(body));
