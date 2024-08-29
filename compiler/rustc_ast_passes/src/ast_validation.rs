@@ -252,7 +252,7 @@ impl<'a> AstValidator<'a> {
     }
 
     fn visit_struct_field_def(&mut self, field: &'a FieldDef) {
-        if let Some(ident) = field.ident
+        if let Some(ident) = &field.ident
             && ident.name == kw::Underscore
         {
             self.check_unnamed_field_ty(&field.ty, ident.span);
@@ -941,7 +941,7 @@ impl<'a> Visitor<'a> for AstValidator<'a> {
                     }
 
                     this.visit_vis(&item.vis);
-                    this.visit_ident(item.ident);
+                    this.visit_ident(&item.ident);
                     let disallowed = matches!(constness, Const::No)
                         .then(|| TildeConstReason::TraitImpl { span: item.span });
                     this.with_tilde_const(disallowed, |this| this.visit_generics(generics));
@@ -996,7 +996,7 @@ impl<'a> Visitor<'a> for AstValidator<'a> {
                     }
 
                     this.visit_vis(&item.vis);
-                    this.visit_ident(item.ident);
+                    this.visit_ident(&item.ident);
                     this.with_tilde_const(
                         Some(TildeConstReason::Impl { span: item.span }),
                         |this| this.visit_generics(generics),
@@ -1034,7 +1034,7 @@ impl<'a> Visitor<'a> for AstValidator<'a> {
                 }
 
                 self.visit_vis(&item.vis);
-                self.visit_ident(item.ident);
+                self.visit_ident(&item.ident);
                 let kind =
                     FnKind::Fn(FnCtxt::Free, item.ident, sig, &item.vis, generics, body.as_deref());
                 self.visit_fn(kind, item.span, item.id);
@@ -1101,7 +1101,7 @@ impl<'a> Visitor<'a> for AstValidator<'a> {
                     // Equivalent of `visit::walk_item` for `ItemKind::Trait` that inserts a bound
                     // context for the supertraits.
                     this.visit_vis(&item.vis);
-                    this.visit_ident(item.ident);
+                    this.visit_ident(&item.ident);
                     let disallowed = is_const_trait
                         .is_none()
                         .then(|| TildeConstReason::Trait { span: item.span });
@@ -1128,7 +1128,7 @@ impl<'a> Visitor<'a> for AstValidator<'a> {
             ItemKind::Struct(vdata, generics) => match vdata {
                 VariantData::Struct { fields, .. } => {
                     self.visit_vis(&item.vis);
-                    self.visit_ident(item.ident);
+                    self.visit_ident(&item.ident);
                     self.visit_generics(generics);
                     // Permit `Anon{Struct,Union}` as field type.
                     walk_list!(self, visit_struct_field_def, fields);
@@ -1144,7 +1144,7 @@ impl<'a> Visitor<'a> for AstValidator<'a> {
                 match vdata {
                     VariantData::Struct { fields, .. } => {
                         self.visit_vis(&item.vis);
-                        self.visit_ident(item.ident);
+                        self.visit_ident(&item.ident);
                         self.visit_generics(generics);
                         // Permit `Anon{Struct,Union}` as field type.
                         walk_list!(self, visit_struct_field_def, fields);
@@ -1569,7 +1569,7 @@ impl<'a> Visitor<'a> for AstValidator<'a> {
                     || matches!(sig.header.constness, Const::Yes(_)) =>
             {
                 self.visit_vis(&item.vis);
-                self.visit_ident(item.ident);
+                self.visit_ident(&item.ident);
                 let kind = FnKind::Fn(
                     FnCtxt::Assoc(ctxt),
                     item.ident,
